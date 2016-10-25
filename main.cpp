@@ -59,7 +59,9 @@ const float markerLength = 1.75;
 double dist_[] = { 0, 0, 0, 0, 0 };
 cv::Mat distCoeffs = cv::Mat(5, 1, CV_64F, dist_).clone();
 cv::Mat imageMat;
-Mat rvec, tvec;
+
+Mat viewMatrix = cv::Mat::zeros(4, 4, CV_32F);
+double m[16];
 
 using namespace std;
 
@@ -108,7 +110,7 @@ GLvoid OnDisplay(void)
 	// Switch to Model View Matrix
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-
+	
 	// Draw a textured quad
 	glBegin(GL_QUADS);
 	glTexCoord2f(0.0f, 0.0f); glVertex2f(0.0f, 0.0f);
@@ -121,34 +123,96 @@ GLvoid OnDisplay(void)
 	//draw the 3d section
 	glDisable(GL_TEXTURE_2D);
 	aspectRatio = VIEWPORT_WIDTH / (float)VIEWPORT_HEIGHT;
+
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
+	gluPerspective(45.0, aspectRatio, 0.1, 100000);
 
-	if (!rvec.empty()) {
-		Mat rot;
-		Rodrigues(rvec, rot);
+	// Capture next frame
+	cap >> imageMat; // get image from camera
 
-		Mat viewMatrix = cv::Mat::zeros(4, 4, CV_32F);
-		for (unsigned int row = 0; row < 3; ++row)
-		{
-			for (unsigned int col = 0; col < 3; ++col)
-			{
-				viewMatrix.at<float>(row, col) = (float)rot.at<double>(row, col);
+	IplImage *image = cvCloneImage(&(IplImage)imageMat);
+
+	cv::aruco::detectMarkers(
+		imageMat,		// input image
+		dictionary,		// type of markers that will be searched for
+		markerCorners,	// output vector of marker corners
+		markerIds,		// detected marker IDs
+		detectorParams,	// algorithm parameters
+		rejectedCandidates);
+
+	if (markerIds.size() > 0) {
+		// Draw all detected markers.
+		cv::aruco::drawDetectedMarkers(imageMat, markerCorners, markerIds);
+
+		std::vector< cv::Vec3d > rvecs, tvecs;
+		cv::aruco::estimatePoseSingleMarkers(
+			markerCorners,	// vector of already detected markers corners
+			markerLength,	// length of the marker's side
+			K,				// input 3x3 floating-point instrinsic camera matrix K
+			distCoeffs,		// vector of distortion coefficients of 4, 5, 8 or 12 elements
+			rvecs,			// array of output rotation vectors 
+			tvecs);			// array of output translation vectors
+
+		for (unsigned int i = 0; i < markerIds.size(); i++) {
+			cv::Vec3d r = rvecs[i];
+			cv::Vec3d t = tvecs[i];
+			if (markerIds[i] == 0) {
+				Mat rot;
+				Rodrigues(rvecs[i], rot);
+				for (unsigned int row = 0; row < 3; ++row)
+				{
+					for (unsigned int col = 0; col < 3; ++col)
+					{
+						viewMatrix.at<float>(row, col) = (float)rot.at<double>(row, col);
+					}
+					viewMatrix.at<float>(row, 3) = (float)tvecs[i][row] * 0.1f;
+				}
+				viewMatrix.at<float>(3, 3) = 1.0f;
+
+				cv::Mat cvToGl = cv::Mat::zeros(4, 4, CV_32F);
+				cvToGl.at<float>(0, 0) = 1.0f;
+				cvToGl.at<float>(1, 1) = -1.0f; // Invert the y axis 
+				cvToGl.at<float>(2, 2) = -1.0f; // invert the z axis 
+				cvToGl.at<float>(3, 3) = 1.0f;
+				viewMatrix = cvToGl * viewMatrix;
+				cv::transpose(viewMatrix, viewMatrix);
+
+				float* src = (float*)viewMatrix.data;
+				m[0] = src[0];  m[1] = src[1];  m[2] = src[2];  m[3] = src[3];
+				m[4] = src[4];  m[5] = src[5];  m[6] = src[6];  m[7] = src[7];
+				m[8] = src[8];  m[9] = src[9];  m[10] = src[10]; m[11] = src[11];
+				m[12] = src[12]; m[13] = src[13]; m[14] = src[14]; m[15] = src[15];
+
+
 			}
-			viewMatrix.at<float>(row, 3) = (float)tvec.at<double>(row) * 0.1f;
+
+			// Draw coordinate axes.
+			cv::aruco::drawAxis(imageMat,
+				K, distCoeffs,			// camera parameters
+				r, t,					// marker pose
+				0.5*markerLength);		// length of the axes to be drawn
+
+										// Draw a symbol in the upper right corner of the detected marker.
 		}
-		viewMatrix.at<float>(3, 3) = 1.0f;
-
-		cv::Mat cvToGl = cv::Mat::zeros(4, 4, CV_32F);
-		cvToGl.at<float>(0, 0) = 1.0f;
-		cvToGl.at<float>(1, 1) = -1.0f; // Invert the y axis 
-		cvToGl.at<float>(2, 2) = -1.0f; // invert the z axis 
-		cvToGl.at<float>(3, 3) = 1.0f;
-		viewMatrix = cvToGl * viewMatrix;
-
-		cv::transpose(viewMatrix, viewMatrix);
 	}
-	
+
+	image = cvCloneImage(&(IplImage)imageMat);
+
+
+	// Convert to RGB
+	cvCvtColor(image, image, CV_BGR2RGB);
+
+	// Create Texture
+	gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGB, image->width, image->height, GL_RGB, GL_UNSIGNED_BYTE, image->imageData);
+
+
+
+		
+	glMatrixMode(GL_MODELVIEW);
+	cout << viewMatrix << endl;
+	glLoadMatrixd(m);
+	glScalef(.5,.5,.5);
 
 
 	static const int coords[6][4][3] = {
@@ -198,59 +262,7 @@ GLvoid OnKeyPress(unsigned char key, int x, int y)
 
 GLvoid OnIdle()
 {
-	// Capture next frame
-	cap >> imageMat; // get image from camera	
 
-	IplImage *image = cvCloneImage(&(IplImage)imageMat);
-
-	cv::aruco::detectMarkers(
-		imageMat,		// input image
-		dictionary,		// type of markers that will be searched for
-		markerCorners,	// output vector of marker corners
-		markerIds,		// detected marker IDs
-		detectorParams,	// algorithm parameters
-		rejectedCandidates);
-
-	if (markerIds.size() > 0) {
-		// Draw all detected markers.
-		cv::aruco::drawDetectedMarkers(imageMat, markerCorners, markerIds);
-
-		std::vector< cv::Vec3d > rvecs, tvecs;
-		cv::aruco::estimatePoseSingleMarkers(
-			markerCorners,	// vector of already detected markers corners
-			markerLength,	// length of the marker's side
-			K,				// input 3x3 floating-point instrinsic camera matrix K
-			distCoeffs,		// vector of distortion coefficients of 4, 5, 8 or 12 elements
-			rvecs,			// array of output rotation vectors 
-			tvecs);			// array of output translation vectors
-
-		for (unsigned int i = 0; i < markerIds.size(); i++) {
-			cv::Vec3d r = rvecs[i];
-			cv::Vec3d t = tvecs[i];
-			if (markerIds[i] == 0) {
-				rvec = Mat(rvecs[i]);
-				tvec = Mat(tvecs[i]);
-
-			}
-
-			// Draw coordinate axes.
-			cv::aruco::drawAxis(imageMat,
-				K, distCoeffs,			// camera parameters
-				r, t,					// marker pose
-				0.5*markerLength);		// length of the axes to be drawn
-
-										// Draw a symbol in the upper right corner of the detected marker.
-		}
-	}
-
-	image = cvCloneImage(&(IplImage)imageMat);
-
-
-	// Convert to RGB
-	cvCvtColor(image, image, CV_BGR2RGB);
-
-	// Create Texture
-	gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGB, image->width, image->height, GL_RGB, GL_UNSIGNED_BYTE, image->imageData);
 
 	// Update View port
 	glutPostRedisplay();
