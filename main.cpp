@@ -66,6 +66,7 @@ using namespace std;
 int main(int argc, char* argv[])
 {
 
+
 	// Create GLUT Window
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
@@ -85,8 +86,26 @@ int main(int argc, char* argv[])
 
 GLvoid InitGL()
 {
-
 	glClearColor(0.0, 0.0, 0.0, 0.0);
+	glShadeModel(GL_SMOOTH);
+	
+
+	//Lighting
+	// enable lighting
+	glEnable(GL_LIGHTING);
+	// enable light 0
+	glEnable(GL_LIGHT0);
+
+	// set the values for each component of lighting
+	float diffuseLightCol[4] = { 1.0, 1.0, 1.0, 1 };	// white light
+	float specularLightCol[4] = { 1.0, 1.0, 1.0, 1 };	// white light
+	float ambientCol[4] = { 0.1, 0.1, 0.1, 1.0 };		// set this to be very low
+														// and now set each value
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuseLightCol);
+	glLightfv(GL_LIGHT0, GL_SPECULAR, specularLightCol);
+	glLightfv(GL_LIGHT0, GL_AMBIENT, ambientCol);
+
+
 
 	glutDisplayFunc(OnDisplay);
 	glutReshapeFunc(OnReshape);
@@ -122,6 +141,8 @@ GLvoid OnDisplay(void)
 
 	//draw the 3d section
 	glDisable(GL_TEXTURE_2D);
+	glClear(GL_DEPTH_BUFFER_BIT);
+
 	float aspectRatio = windowWidth / (float)windowHeight;
 
 	glMatrixMode(GL_PROJECTION);
@@ -204,34 +225,29 @@ GLvoid OnDisplay(void)
 
 
 	glMatrixMode(GL_MODELVIEW);
-	glLoadMatrixf((float*)viewMatrix.data);
-	glScalef(.5, .5, .5);
 
-
-	static const int coords[6][4][3] = {
-		{ { +1, -1, -1 },{ -1, -1, -1 },{ -1, +1, -1 },{ +1, +1, -1 } },
-		{ { +1, +1, -1 },{ -1, +1, -1 },{ -1, +1, +1 },{ +1, +1, +1 } },
-		{ { +1, -1, +1 },{ +1, -1, -1 },{ +1, +1, -1 },{ +1, +1, +1 } },
-		{ { -1, -1, -1 },{ -1, -1, +1 },{ -1, +1, +1 },{ -1, +1, -1 } },
-		{ { +1, -1, +1 },{ -1, -1, +1 },{ -1, -1, -1 },{ +1, -1, -1 } },
-		{ { -1, -1, +1 },{ +1, -1, +1 },{ +1, +1, +1 },{ -1, +1, +1 } }
-	};
-
-	/*for (int i = 0; i < 6; ++i) {
-	glColor3ub(i * 20, 100 + i * 10, i * 42);
-	glBegin(GL_QUADS);
-	for (int j = 0; j < 4; ++j) {
-	glVertex3d(0.2*coords[i][j][0], 0.2 * coords[i][j][1], 0.2*coords[i][j][2]);
-	}
-	glEnd();
-	}*/
-	obj->draw();
-
+	glColor3f(1, 0, 0);
+	glPushMatrix(); {
+		glLoadMatrixf((float*)viewMatrix.data);
+		glScalef(.5, .5, .5);
+		obj->draw();
+	}glPopMatrix();
 
 
 
 	glFlush();
 	glutSwapBuffers();
+
+
+	//Check for errors
+	GLenum glErr;
+
+	glErr = glGetError();
+	if (glErr != GL_NO_ERROR)
+	{
+		printf("glError %s\n",gluErrorString(glErr));
+	}
+
 
 }
 
