@@ -1,4 +1,6 @@
-#include "stdafx.h"
+#ifdef _WIN32
+    #include "stdafx.h"
+#endif
 
 #include <iostream>
 #include <stdio.h>
@@ -61,7 +63,6 @@ cv::Mat distCoeffs = cv::Mat(5, 1, CV_64F, dist_).clone();
 cv::Mat imageMat;
 
 Mat viewMatrix = cv::Mat::zeros(4, 4, CV_32F);
-double m[16];
 
 using namespace std;
 
@@ -131,7 +132,7 @@ GLvoid OnDisplay(void)
 	// Capture next frame
 	cap >> imageMat; // get image from camera
 
-	IplImage *image = cvCloneImage(&(IplImage)imageMat);
+	IplImage *image;
 
 	cv::aruco::detectMarkers(
 		imageMat,		// input image
@@ -178,13 +179,6 @@ GLvoid OnDisplay(void)
 				viewMatrix = cvToGl * viewMatrix;
 				cv::transpose(viewMatrix, viewMatrix);
 
-				float* src = (float*)viewMatrix.data;
-				m[0] = src[0];  m[1] = src[1];  m[2] = src[2];  m[3] = src[3];
-				m[4] = src[4];  m[5] = src[5];  m[6] = src[6];  m[7] = src[7];
-				m[8] = src[8];  m[9] = src[9];  m[10] = src[10]; m[11] = src[11];
-				m[12] = src[12]; m[13] = src[13]; m[14] = src[14]; m[15] = src[15];
-
-
 			}
 
 			// Draw coordinate axes.
@@ -197,7 +191,8 @@ GLvoid OnDisplay(void)
 		}
 	}
 
-	image = cvCloneImage(&(IplImage)imageMat);
+	IplImage copy = imageMat;
+ 	image = &copy;
 
 
 	// Convert to RGB
@@ -210,8 +205,7 @@ GLvoid OnDisplay(void)
 
 		
 	glMatrixMode(GL_MODELVIEW);
-	cout << viewMatrix << endl;
-	glLoadMatrixd(m);
+	glLoadMatrixf((float*)viewMatrix.data);
 	glScalef(.5,.5,.5);
 
 
@@ -262,8 +256,6 @@ GLvoid OnKeyPress(unsigned char key, int x, int y)
 
 GLvoid OnIdle()
 {
-
-
 	// Update View port
 	glutPostRedisplay();
 }
