@@ -218,12 +218,12 @@ GLvoid OnDisplay(void)
 	};
 
 	/*for (int i = 0; i < 6; ++i) {
-		glColor3ub(i * 20, 100 + i * 10, i * 42);
-		glBegin(GL_QUADS);
-		for (int j = 0; j < 4; ++j) {
-			glVertex3d(0.2*coords[i][j][0], 0.2 * coords[i][j][1], 0.2*coords[i][j][2]);
-		}
-		glEnd();
+	glColor3ub(i * 20, 100 + i * 10, i * 42);
+	glBegin(GL_QUADS);
+	for (int j = 0; j < 4; ++j) {
+	glVertex3d(0.2*coords[i][j][0], 0.2 * coords[i][j][1], 0.2*coords[i][j][2]);
+	}
+	glEnd();
 	}*/
 	obj->draw();
 
