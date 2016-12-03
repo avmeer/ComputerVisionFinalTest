@@ -84,6 +84,7 @@ int main(int argc, char* argv[])
 
 GLvoid InitGL()
 {
+	glEnable(GL_DEPTH_TEST);
 	glClearColor(0.0, 0.0, 0.0, 0.0);
 	glShadeModel(GL_SMOOTH);
 	
@@ -196,6 +197,10 @@ GLvoid OnDisplay(void)
 				cvToGl.at<float>(3, 3) = 1.0f;
 				viewMatrix = cvToGl * viewMatrix;
 				cv::transpose(viewMatrix, viewMatrix);
+				viewMatrix.at<float>(0, 3) = 0;
+				viewMatrix.at<float>(1, 3) = 0;
+				viewMatrix.at<float>(2, 3) = 0;
+				viewMatrix.at<float>(3, 3) = 1;
 
 			}
 
